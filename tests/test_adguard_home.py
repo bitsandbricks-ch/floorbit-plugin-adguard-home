@@ -65,3 +65,16 @@ def test_adguard_explains_a_wrong_password(make, adguard):
     with pytest.raises(PluginError, match=r"^AdGuard Home refused the username or password\.$"):
         make(**{**SETTINGS, "password": "wrong"}).test()
     assert make(**SETTINGS).test()
+
+
+def test_the_answers_come_along_for_naming_traffic():
+    from conftest import load
+    entry = load("plugin").entry
+    row = {"time": iso(T0), "question": {"name": "cdn.example.com", "type": "A"}, "client": "198.51.100.1",
+           "reason": "NotFilteredNotFound",
+           "answer": [{"type": "CNAME", "value": "edge.example.net", "ttl": 60},
+                      {"type": "A", "value": "203.0.113.7", "ttl": 55},
+                      {"type": "AAAA", "value": "2001:db8::7", "ttl": 55}]}
+    assert entry(row)["answers"] == [{"address": "203.0.113.7", "ttl": 55}, {"address": "2001:db8::7", "ttl": 55}]
+    blocked = {**row, "reason": "FilteredBlackList", "answer": [{"type": "A", "value": "0.0.0.0", "ttl": 10}]}
+    assert "answers" not in entry(blocked)

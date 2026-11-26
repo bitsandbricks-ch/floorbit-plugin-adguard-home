@@ -29,12 +29,27 @@ def parse_time(value):
         return None
 
 
+def answers(row):
+    """The addresses AdGuard Home gave (``answer``: ``[{"type": "A", "value": ..., "ttl": ...}]``). The
+    agent keeps them in memory to name the seat's HTTPS traffic (Floorbit's docs/flows.md) and never
+    sends them on."""
+    out = []
+    for a in row.get('answer') or []:
+        if isinstance(a, dict) and a.get('type') in ('A', 'AAAA') and a.get('value'):
+            out.append({'address': str(a['value']), 'ttl': a.get('ttl')})
+    return out[:16]
+
+
 def entry(row):
     ts = parse_time(row.get('time'))
     name = (row.get('question') or {}).get('name') if isinstance(row.get('question'), dict) else None
     if ts is None or not name:
         return None
-    return {'ts': ts, 'domain': name, 'client': row.get('client') or '', 'blocked': row.get('reason') in BLOCKED}
+    out = {'ts': ts, 'domain': name, 'client': row.get('client') or '', 'blocked': row.get('reason') in BLOCKED}
+    found = answers(row) if isinstance(row.get('answer'), list) else []
+    if found and not out['blocked']:
+        out['answers'] = found
+    return out
 
 
 class Plugin(Base):
